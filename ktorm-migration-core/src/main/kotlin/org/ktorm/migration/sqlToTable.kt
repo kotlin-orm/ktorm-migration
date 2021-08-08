@@ -1,17 +1,42 @@
 package org.ktorm.migration
 
 import org.ktorm.dsl.QueryRowSet
-import org.ktorm.expression.ColumnExpression
 import org.ktorm.expression.ScalarExpression
 import org.ktorm.expression.SqlExpression
 import org.ktorm.schema.BaseTable
 
 public class BuildingTables {
-    public val tables: MutableMap<TableReferenceExpression, MigrationTable> = HashMap()
+    internal val _tables: MutableMap<TableReferenceExpression, MigrationTable> = HashMap()
+    public val tables: Map<TableReferenceExpression, MigrateTableMixin> get() = _tables
+    internal val _appliedMigrations = HashSet<Migration>()
+    public val appliedMigrations: Set<Migration> get() = _appliedMigrations
+
+    public fun apply(migration: Migration) {
+        if (!_appliedMigrations.add(migration)) return
+        for (dep in migration.dependsOn) {
+            process(dep)
+        }
+        migration.actions.forEach { it.migrateTables(tables) }
+        val processed = HashSet<Migration>()
+        fun process(migration: Migration) {
+        }
+        process(this)
+    }
+    public fun Migration.undoTables(tables: BuildingTables) {
+        val processed = HashSet<Migration>()
+        fun process(migration: Migration) {
+            if (!processed.add(migration)) return
+            for (dep in migration.dependsOn) {
+                process(dep)
+            }
+            migration.actions.asReversed().forEach { it.undoTables(tables) }
+        }
+        process(this)
+    }
 
     public fun apply(sql: SqlExpression) {
         when(sql){
-            is CreateTableExpression -> tables[sql.name] = MigrationTable(
+            is CreateTableExpression -> _tables[sql.name] = MigrationTable(
                 tableName = sql.name.name,
                 alias = null,
                 catalog = sql.name.catalog,
@@ -30,14 +55,14 @@ public class BuildingTables {
                 }
                 for (constraint in sql.constraints) {
                     if (constraint.value is PrimaryKeyTableConstraintExpression) continue
-                    constraints[constraint.key] = constraint.value.reverse(this) { tables[it]!! }
+                    constraints[constraint.key] = constraint.value.reverse(this) { _tables[it]!! }
                 }
             }
             is DropTableExpression -> {
-                tables.remove(sql.table)
+                _tables.remove(sql.table)
             }
             is AlterTableAddExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy().apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
                     registerColumn(sql.column.name, sql.column.sqlType)
                     val col = sql.column
                     if (col.notNull) columnNotNull.add(col.name)
@@ -47,12 +72,12 @@ public class BuildingTables {
                 } 
             }
             is AlterTableDropColumnExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
                     scrubAnnotations(sql.column.name)
                 }
             }
             is AlterTableModifyColumnExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
                     registerColumn(sql.column.name, sql.newType)
                     if(sql.size != null) this.columnSize[sql.column.name] = sql.size
                     else this.columnSize.remove(sql.column.name)
@@ -61,22 +86,22 @@ public class BuildingTables {
                 }
             }
             is AlterTableSetDefaultExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy().apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
                     columnDefault[sql.column.name] = sql.default
                 }
             }
             is AlterTableDropDefaultExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy().apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
                     columnDefault.remove(sql.column.name)
                 }
             }
             is AlterTableAddConstraintExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy().apply {
-                    constraints[sql.constraintName] = sql.tableConstraint.reverse(this) { tables[it]!! }
+                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
+                    constraints[sql.constraintName] = sql.tableConstraint.reverse(this) { _tables[it]!! }
                 }
             }
             is AlterTableDropConstraintExpression -> {
-                tables[sql.table] = tables[sql.table]!!.copy().apply {
+                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
                     constraints.remove(sql.constraintName)
                 }
             }
@@ -84,7 +109,7 @@ public class BuildingTables {
     }
 }
 
-public class MigrationTable(
+internal class MigrationTable(
     tableName: String,
     alias: String? = null,
     catalog: String? = null,

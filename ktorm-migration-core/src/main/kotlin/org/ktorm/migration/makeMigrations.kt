@@ -11,48 +11,41 @@ public fun initializeMigrations(
 
         import org.ktorm.migration.Migration
 
-        public typealias LatestMigration = Migration.None
+        public val LatestMigration: Migration? = null
     """.trimIndent())
 
 }
 
+private val Migration.number: Int get() = (this::class.simpleName ?: "").substringAfter("Migration").takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+internal val Migration.packageName: String get() = (this::class.qualifiedName!!.substringBeforeLast('.'))
+
 public fun makeMigrations(
     folder: File,
     packageName: String,
-    latestMigration: Migration = Migration.None,
-    migrationName: String = "Migration${(latestMigration.number + 1).toString().padStart(4, '0')}",
+    latestMigration: Migration? = null,
+    migrationName: String = "Migration${((latestMigration?.number ?: 0) + 1).toString().padStart(4, '0')}",
     vararg tables: MigrateTableMixin
 ): Boolean {
     folder.mkdirs()
     val building = BuildingTables()
-    val processed = HashSet<Migration>()
-    fun process(migration: Migration) {
-        if (!processed.add(migration)) return
-        for (dep in migration.dependsOn) {
-            process(dep)
-        }
-        migration.migrateTables(building)
-    }
-    process(latestMigration)
+    latestMigration?.migrateTables(building)
 
-    val updates = building.tables.values.upgradeTo(tables.toList())
+    val updates = building._tables.values.upgradeTo(tables.toList())
     if(updates.isEmpty()) {
         return false
     }
 
     val out = StringBuilder()
-    out.appendLine("package $packageName")
-    out.appendLine("import ${latestMigration::class.qualifiedName}")
     updates.generateMigrationSource(
         name = migrationName,
-        number = latestMigration.number + 1,
+        packageName = packageName,
         dependsOn = listOf(latestMigration::class.simpleName!!),
         out = out
     )
     folder.resolve("$migrationName.kt").writeText(out.toString())
     folder.resolve("LatestMigration.kt").writeText("""
         package $packageName
-        public typealias LatestMigration = $migrationName
+        public val LatestMigration: Migration? = $migrationName
     """.trimIndent())
 
     return true

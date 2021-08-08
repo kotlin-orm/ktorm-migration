@@ -95,6 +95,7 @@ public data class CreateTableExpression(
     val name: TableReferenceExpression,
     val columns: List<ColumnDeclarationExpression<*>>,
     val constraints: Map<String, TableConstraintExpression> = emptyMap(),
+    val ifNotExists: Boolean = false,
     override val isLeafNode: Boolean = false,
     override val extraProperties: Map<String, Any> = emptyMap()
 ) : SqlExpression(), ReversibleMigrationExpression {

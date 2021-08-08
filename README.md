@@ -3,7 +3,7 @@ Ktorm migration support
 
 ## Status
 
-Mostly complete, but needs testing and documentation.
+Mostly complete, but needs api stabilization, testing and documentation.
 
 ## Usage
 

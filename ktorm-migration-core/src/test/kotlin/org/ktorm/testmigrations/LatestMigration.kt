@@ -1,2 +1,5 @@
 package org.ktorm.testmigrations
-public typealias LatestMigration = Migration0002
+
+import org.ktorm.migration.Migration
+
+public val LatestMigration: Migration? = null

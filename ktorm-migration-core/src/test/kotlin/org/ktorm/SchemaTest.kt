@@ -1,11 +1,9 @@
 package org.ktorm
 
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.ktorm.database.Database
 import org.ktorm.database.SqlDialect
-import org.ktorm.database.asIterable
 import org.ktorm.dsl.insert
 import org.ktorm.entity.Entity
 import org.ktorm.entity.sequenceOf
@@ -16,7 +14,6 @@ import org.ktorm.migration.*
 import org.ktorm.schema.*
 import org.ktorm.testmigrations.LatestMigration
 import java.io.File
-import java.io.Serializable
 import java.time.LocalDate
 import kotlin.test.assertEquals
 
@@ -68,9 +65,9 @@ open class SchemaTest {
     @Test
     fun reverse() {
         val tables = BuildingTables()
-        tables.tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(Employees.createTable())
-        val recreated = tables.tables[Employees.asReferenceExpression()]!!
+        val recreated = tables._tables[Employees.asReferenceExpression()]!!
         println("Original  : ${Employees.structuralInfo}")
         println("Reproduced: ${recreated.structuralInfo}")
         assertEquals(recreated.structuralInfo.toString(), Employees.structuralInfo.toString())
@@ -79,9 +76,9 @@ open class SchemaTest {
     @Test
     fun noUpgradeNeeded() {
         val tables = BuildingTables()
-        tables.tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(Employees.createTable())
-        val recreated = tables.tables[Employees.asReferenceExpression()]!!
+        val recreated = tables._tables[Employees.asReferenceExpression()]!!
         val ops = recreated.upgradeTo(Employees)
         assertEquals(listOf(), ops)
     }
@@ -181,9 +178,9 @@ open class SchemaTest {
             )
         )
         val tables = BuildingTables()
-        tables.tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(currentState)
-        val recreated = tables.tables[Employees.asReferenceExpression()]!!
+        val recreated = tables._tables[Employees.asReferenceExpression()]!!
         val updates = recreated.upgradeTo(Employees)
         val out = StringBuilder()
         updates.generateMigrationSource("TestMigration", number = 1, dependsOn = listOf("PreviousMigration"), out = out)

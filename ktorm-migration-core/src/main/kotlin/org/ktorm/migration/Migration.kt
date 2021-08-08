@@ -8,26 +8,43 @@ import java.lang.Appendable
 import java.time.LocalDate
 
 public interface Migration : MigrationDSL {
-    public val number: Int
     public val dependsOn: List<Migration>
     public val actions: List<MigrationAction>
-    public object None: Migration {
-        override val number: Int get() = 0
-        override val dependsOn: List<Migration> = listOf()
-        override val actions: List<MigrationAction> = listOf()
-    }
 }
 public fun Migration.migrate(database: Database) {
+    val currentNumber = database.migrationNumberFor(this.packageName)
+    val processed = HashSet<Migration>()
+    fun process(migration: Migration) {
+        if (!processed.add(migration)) return
+        if (migration.number <= currentNumber) return
+        for (dep in migration.dependsOn) {
+            process(dep)
+        }
+        database.useTransaction {
+            migration.migrateThisOnly(database)
+            database.markCompleted(migration)
+        }
+    }
+    process(this)
+}
+public fun Migration.undo(database: Database, backTo: Migration) {
+
+    val processed = HashSet<Migration>()
+    fun process(migration: Migration) {
+        if (!processed.add(migration)) return
+        for (dep in migration.dependsOn) {
+            process(dep)
+        }
+        migration.migrateTables(building)
+    }
+    process(latestMigration)
+}
+
+private fun Migration.migrateThisOnly(database: Database) {
     actions.forEach { it.migrate(database) }
 }
-public fun Migration.undo(database: Database) {
+private fun Migration.undoThisOnly(database: Database) {
     actions.asReversed().forEach { it.undo(database) }
-}
-public fun Migration.migrateTables(tables: BuildingTables) {
-    actions.forEach { it.migrateTables(tables) }
-}
-public fun Migration.undoTables(tables: BuildingTables) {
-    actions.asReversed().forEach { it.undoTables(tables) }
 }
 
 public sealed class MigrationAction {
@@ -175,12 +192,16 @@ public class CreateTableExpressionBuilder {
 
 public fun List<ReversibleMigrationExpression>.generateMigrationSource(
     name: String,
-    number: Int,
-    dependsOn: List<String>,
+    packageName: String,
+    dependsOn: List<Migration>,
     out: Appendable
 ) {
     val regen = SourceRegenerator()
     regen.visit(this.map { MigrationAction.ReversibleSql(it) })
+    out.appendLine("package $packageName")
+    for(dep in dependsOn) {
+        out.appendLine("import ${dep::class.qualifiedName}")
+    }
     out.appendLine("import org.ktorm.migration.Migration")
     out.appendLine("import org.ktorm.migration.MigrationAction")
     for(import in regen.imports){
@@ -188,8 +209,7 @@ public fun List<ReversibleMigrationExpression>.generateMigrationSource(
     }
     out.appendLine()
     out.appendLine("public object $name: Migration {")
-    out.appendLine("    override val number: Int = $number")
-    out.appendLine("    override val dependsOn: List<Migration> = listOf(${dependsOn.joinToString()})")
+    out.appendLine("    override val dependsOn: List<Migration> = listOf(${dependsOn.joinToString(){ it::class.simpleName!! }})")
     out.appendLine("    override val actions: List<MigrationAction> = ${regen.builder}")
     out.appendLine("}")
 }
