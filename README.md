@@ -3,7 +3,7 @@ Ktorm migration support
 
 ## Status
 
-Needs a full tutorial, supporting tools, and testing, but otherwise complete.
+Needs a full tutorial, supporting tools, and more testing, but otherwise complete.
 
 ## Usage
 
@@ -57,7 +57,7 @@ myDatabase.migrate(LatestMigration)
 
 ## Known issues
 
-- We need a lot of testing
+- We need a lot more testing
 - Transformed fields are unsupported in automatic migration generation, due to being not being reproducible in source.
 - No specific database `Dialect` implements `SqlSchemaFormatter` yet
   - Specific implementations are gonna be annoying.  This repo will need a module for every supported one.
