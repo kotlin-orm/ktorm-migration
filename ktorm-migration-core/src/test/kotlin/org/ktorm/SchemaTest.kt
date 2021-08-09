@@ -15,6 +15,7 @@ import org.ktorm.schema.*
 import org.ktorm.testmigrations.LatestMigration
 import java.io.File
 import java.time.LocalDate
+import java.util.*
 import kotlin.test.assertEquals
 
 /**
@@ -64,10 +65,10 @@ open class SchemaTest {
 
     @Test
     fun reverse() {
-        val tables = BuildingTables()
-        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        val tables = TableRebuilder()
+        tables.tablesInternal[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(Employees.createTable())
-        val recreated = tables._tables[Employees.asReferenceExpression()]!!
+        val recreated = tables.tables[Employees.asReferenceExpression()]!!
         println("Original  : ${Employees.structuralInfo}")
         println("Reproduced: ${recreated.structuralInfo}")
         assertEquals(recreated.structuralInfo.toString(), Employees.structuralInfo.toString())
@@ -75,10 +76,10 @@ open class SchemaTest {
 
     @Test
     fun noUpgradeNeeded() {
-        val tables = BuildingTables()
-        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        val tables = TableRebuilder()
+        tables.tablesInternal[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(Employees.createTable())
-        val recreated = tables._tables[Employees.asReferenceExpression()]!!
+        val recreated = tables.tables[Employees.asReferenceExpression()]!!
         val ops = recreated.upgradeTo(Employees)
         assertEquals(listOf(), ops)
     }
@@ -177,10 +178,10 @@ open class SchemaTest {
                         )
             )
         )
-        val tables = BuildingTables()
-        tables._tables[Departments.asReferenceExpression()] = Departments.asMigrationTable()
+        val tables = TableRebuilder()
+        tables.tablesInternal[Departments.asReferenceExpression()] = Departments.asMigrationTable()
         tables.apply(currentState)
-        val recreated = tables._tables[Employees.asReferenceExpression()]!!
+        val recreated = tables.tablesInternal[Employees.asReferenceExpression()]!!
         val updates = recreated.upgradeTo(Employees)
         val out = StringBuilder()
         updates.generateMigrationSource("TestMigration", packageName = "org.ktorm.test", dependsOn = listOf(), out = out)
@@ -189,7 +190,7 @@ open class SchemaTest {
 
     @Test
     fun fullMigration(){
-        val updates = listOf<MigrateTableMixin>().upgradeTo(listOf(Departments, Employees, Customers))
+        val updates = listOf<MigratableTableMixin>().upgradeTo(listOf(Departments, Employees, Customers))
         val out = StringBuilder()
         updates.generateMigrationSource("TestMigration", packageName = "org.ktorm.test", dependsOn = listOf(), out = out)
         println(out)
@@ -203,6 +204,7 @@ open class SchemaTest {
                 get() = "org.ktorm.test.GeneratedMigration"
         }
         database.migrate(migration)
+        database.migrate(migration) // Should do nothing
         database.insert(Departments) {
             set(it.id, 0)
             set(it.name, "Test Department")
@@ -223,7 +225,7 @@ open class SchemaTest {
             folder = File("src/test/kotlin/org/ktorm/testmigrations"),
             packageName = "org.ktorm.testmigrations",
             latestMigration = LatestMigration,
-            tables = arrayOf(
+            tables = listOf(
                 Departments,
                 Employees,
                 Customers
@@ -260,8 +262,8 @@ open class SchemaTest {
         var salary: Long
         var department: Department
 
-        val upperName get() = name.toUpperCase()
-        fun upperName() = name.toUpperCase()
+        val upperName get() = name.uppercase(Locale.getDefault())
+        fun upperName() = name.uppercase(Locale.getDefault())
     }
 
     interface Customer : Entity<Customer> {
@@ -274,7 +276,8 @@ open class SchemaTest {
         var address: String
     }
 
-    open class Departments(alias: String?) : MigrateTable<Department>("t_department", alias) {
+    @Suppress("LeakingThis")
+    open class Departments(alias: String?) : MigratableTable<Department>("t_department", alias) {
         companion object : Departments(null)
 
         override fun aliased(alias: String) = Departments(alias)
@@ -286,7 +289,8 @@ open class SchemaTest {
         val mixedCase = varchar("mixedCase").size(128).bindTo { it.mixedCase }
     }
 
-    open class Employees(alias: String?) : MigrateTable<Employee>("t_employee", alias) {
+    @Suppress("LeakingThis")
+    open class Employees(alias: String?) : MigratableTable<Employee>("t_employee", alias) {
         companion object : Employees(null)
 
         override fun aliased(alias: String) = Employees(alias)
@@ -301,7 +305,8 @@ open class SchemaTest {
         val department = departmentId.referenceTable as Departments
     }
 
-    open class Customers(alias: String?) : MigrateTable<Customer>("t_customer", alias, schema = "company") {
+    @Suppress("LeakingThis")
+    open class Customers(alias: String?) : MigratableTable<Customer>("t_customer", alias, schema = "company") {
         companion object : Customers(null)
 
         override fun aliased(alias: String) = Customers(alias)
@@ -314,8 +319,6 @@ open class SchemaTest {
     }
 
     val Database.departments get() = this.sequenceOf(Departments)
-
     val Database.employees get() = this.sequenceOf(Employees)
-
     val Database.customers get() = this.sequenceOf(Customers)
 }

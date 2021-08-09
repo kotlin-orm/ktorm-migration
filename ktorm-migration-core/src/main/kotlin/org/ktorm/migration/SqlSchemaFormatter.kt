@@ -246,7 +246,21 @@ public abstract class SqlSchemaFormatter(
             else write(", ")
             write(col.value.name.quoted)
         }
-        write(")")
+        //TODO: Check support for ON UPDATE and ON DELETE
+        writeKeyword(") on update ")
+        when(expr.onUpdate){
+            ForeignKeyConstraint.OnModification.Error -> writeKeyword("restrict")
+            ForeignKeyConstraint.OnModification.Cascade -> writeKeyword("cascade")
+            ForeignKeyConstraint.OnModification.SetNull -> writeKeyword("set null")
+            ForeignKeyConstraint.OnModification.SetDefault -> writeKeyword("set default")
+        }
+        writeKeyword(" on delete ")
+        when(expr.onUpdate){
+            ForeignKeyConstraint.OnModification.Error -> writeKeyword("restrict")
+            ForeignKeyConstraint.OnModification.Cascade -> writeKeyword("cascade")
+            ForeignKeyConstraint.OnModification.SetNull -> writeKeyword("set null")
+            ForeignKeyConstraint.OnModification.SetDefault -> writeKeyword("set default")
+        }
         return expr
     }
     protected open fun visitCheckTableConstraint(expr: CheckTableConstraintExpression): CheckTableConstraintExpression {

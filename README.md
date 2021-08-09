@@ -3,11 +3,11 @@ Ktorm migration support
 
 ## Status
 
-Mostly complete, but needs api stabilization, testing and documentation.
+Needs a full tutorial, supporting tools, and testing, but otherwise complete.
 
 ## Usage
 
-In your app, use `MigrateTable`, `MigrateBaseTable`, `MigrateMapTable`, or `MigrateTableMixin` instead of your usual tables.
+In your app, use `MigratableTable`, `MigratableBaseTable`, `MigratableMapTable`, or `MigratableTableMixin` instead of your usual tables.
 
 You now have access to additional extension functions on your types, including
 
@@ -57,7 +57,7 @@ myDatabase.migrate(LatestMigration)
 
 ## Known issues
 
-- We need a lot of documentation and testing
+- We need a lot of testing
 - Transformed fields are unsupported in automatic migration generation, due to being not being reproducible in source.
 - No specific database `Dialect` implements `SqlSchemaFormatter` yet
   - Specific implementations are gonna be annoying.  This repo will need a module for every supported one.

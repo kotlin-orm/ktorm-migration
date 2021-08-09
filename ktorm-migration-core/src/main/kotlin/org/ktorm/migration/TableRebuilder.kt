@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018-2021 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.ktorm.migration
 
 import org.ktorm.dsl.QueryRowSet
@@ -5,12 +21,27 @@ import org.ktorm.expression.ScalarExpression
 import org.ktorm.expression.SqlExpression
 import org.ktorm.schema.BaseTable
 
-public class BuildingTables {
-    internal val _tables: MutableMap<TableReferenceExpression, MigrationTable> = HashMap()
-    public val tables: Map<TableReferenceExpression, MigrateTableMixin> get() = _tables
-    internal val _appliedMigrations = HashSet<Migration>()
-    public val appliedMigrations: Set<Migration> get() = _appliedMigrations
+/**
+ * Rebuilds the schema from a collection of migrations.
+ */
+public class TableRebuilder {
 
+    /**
+     * The tables this rebuilder knows about.
+     */
+    public val tables: Map<TableReferenceExpression, MigratableTableMixin> get() = tablesInternal
+    internal val tablesInternal: MutableMap<TableReferenceExpression, MigrationTable> = HashMap()
+
+    /**
+     * The migrations which have been applied to this builder.
+     */
+    @Suppress("unused")
+    public val appliedMigrations: Set<Migration> get() = _appliedMigrations
+    private val _appliedMigrations = HashSet<Migration>()
+
+    /**
+     * Applies a migration.
+     */
     public fun apply(migration: Migration) {
         if (!_appliedMigrations.add(migration)) return
         for (dep in migration.dependsOn) {
@@ -19,9 +50,12 @@ public class BuildingTables {
         migration.actions.forEach { it.migrateTables(this) }
     }
 
+    /**
+     * Applies an individual migration expression.
+     */
     public fun apply(sql: SqlExpression) {
         when(sql){
-            is CreateTableExpression -> _tables[sql.name] = MigrationTable(
+            is CreateTableExpression -> tablesInternal[sql.name] = MigrationTable(
                 tableName = sql.name.name,
                 alias = null,
                 catalog = sql.name.catalog,
@@ -40,14 +74,14 @@ public class BuildingTables {
                 }
                 for (constraint in sql.constraints) {
                     if (constraint.value is PrimaryKeyTableConstraintExpression) continue
-                    constraints[constraint.key] = constraint.value.reverse(this) { _tables[it]!! }
+                    constraints[constraint.key] = constraint.value.reverse(this) { tablesInternal[it]!! }
                 }
             }
             is DropTableExpression -> {
-                _tables.remove(sql.table)
+                tablesInternal.remove(sql.table)
             }
             is AlterTableAddExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy().apply {
                     registerColumn(sql.column.name, sql.column.sqlType)
                     val col = sql.column
                     if (col.notNull) columnNotNull.add(col.name)
@@ -57,12 +91,12 @@ public class BuildingTables {
                 } 
             }
             is AlterTableDropColumnExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
                     scrubAnnotations(sql.column.name)
                 }
             }
             is AlterTableModifyColumnExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy(skipColumns = listOf(sql.column.name)).apply {
                     registerColumn(sql.column.name, sql.newType)
                     if(sql.size != null) this.columnSize[sql.column.name] = sql.size
                     else this.columnSize.remove(sql.column.name)
@@ -71,22 +105,22 @@ public class BuildingTables {
                 }
             }
             is AlterTableSetDefaultExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy().apply {
                     columnDefault[sql.column.name] = sql.default
                 }
             }
             is AlterTableDropDefaultExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy().apply {
                     columnDefault.remove(sql.column.name)
                 }
             }
             is AlterTableAddConstraintExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
-                    constraints[sql.constraintName] = sql.tableConstraint.reverse(this) { _tables[it]!! }
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy().apply {
+                    constraints[sql.constraintName] = sql.tableConstraint.reverse(this) { tablesInternal[it]!! }
                 }
             }
             is AlterTableDropConstraintExpression -> {
-                _tables[sql.table] = _tables[sql.table]!!.copy().apply {
+                tablesInternal[sql.table] = tablesInternal[sql.table]!!.copy().apply {
                     constraints.remove(sql.constraintName)
                 }
             }
@@ -99,7 +133,7 @@ internal class MigrationTable(
     alias: String? = null,
     catalog: String? = null,
     schema: String? = null
-) : BaseTable<Map<String, Any?>>(tableName, alias, catalog, schema), MigrateTableMixin {
+) : BaseTable<Map<String, Any?>>(tableName, alias, catalog, schema), MigratableTableMixin {
     override fun doCreateEntity(row: QueryRowSet, withReferences: Boolean): Map<String, Any?> {
         return columns.associate { it.name to row[it] }
     }
@@ -140,7 +174,7 @@ internal class MigrationTable(
     }
 }
 
-internal fun MigrateTableMixin.asMigrationTable(): MigrationTable {
+internal fun MigratableTableMixin.asMigrationTable(): MigrationTable {
     val new = MigrationTable(self.tableName, self.alias, self.catalog, self.schema)
     new.columnNotNull.addAll(columnNotNull)
     new.columnAutoIncrement.addAll(columnAutoIncrement)

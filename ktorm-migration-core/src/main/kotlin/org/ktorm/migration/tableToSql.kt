@@ -1,12 +1,25 @@
+/*
+ * Copyright 2018-2021 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.ktorm.migration
 
-import org.ktorm.dsl.QueryRowSet
-import org.ktorm.expression.ScalarExpression
-import org.ktorm.schema.BaseTable
 import org.ktorm.schema.Column
 import org.ktorm.schema.ReferenceBinding
 
-internal fun MigrateTableMixin.createTable(): CreateTableExpression {
+internal fun MigratableTableMixin.createTable(): CreateTableExpression {
     val tableConstraints = HashMap<String, TableConstraintExpression>()
     tableConstraints["${this.self.catalog}_${this.self.schema}_${this.self.tableName}_pk"] = PrimaryKeyTableConstraintExpression(
         across = this.self.primaryKeys.map { it.asReferenceExpression() }
@@ -21,35 +34,10 @@ internal fun MigrateTableMixin.createTable(): CreateTableExpression {
     )
 }
 
-public fun <T: Any> Column<T>.asDeclarationExpression(): ColumnDeclarationExpression<T> {
-    return ColumnDeclarationExpression(
-        name = name,
-        sqlType = sqlType,
-        notNull = notNull,
-        default = default,
-        size = size,
-        autoIncrement = autoIncrement
-    )
-}
-
-public fun Constraint.asExpression(): TableConstraintExpression {
-    return when (val constraint = this) {
-        is UniqueConstraint -> UniqueTableConstraintExpression(
-            across = constraint.across.map { it.asReferenceExpression() }
-        )
-        is ForeignKeyConstraint -> ForeignKeyTableConstraintExpression(
-            otherTable = constraint.to.asReferenceExpression(),
-            correspondence = constraint.correspondence.entries.associate {
-                it.key.asReferenceExpression() to it.value.asReferenceExpression()
-            }
-        )
-        is CheckConstraint -> CheckTableConstraintExpression(
-            condition = constraint.condition
-        )
-        else -> throw IllegalArgumentException()
-    }
-}
-
+/**
+ * Could be used in the future to automatically enable foreign key constraints from [org.ktorm.schema.Table.references] calls.
+ */
+@Suppress("unused")
 private fun handleReferenceBinding(
     tableConstraints: HashMap<String, TableConstraintExpression>,
     it: Column<*>,

@@ -26,6 +26,10 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.full.primaryConstructor
 
+/**
+ * A simple serializer that writes Kotlin source code.
+ * Used in generating migrations.
+ */
 internal class SourceRegenerator {
     val imports = HashSet<String>()
     val builder = StringBuilder()

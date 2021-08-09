@@ -18,12 +18,13 @@ import org.ktorm.migration.MigrationAction.ReversibleSql
 import org.ktorm.migration.CreateSchemaExpression
 import org.ktorm.migration.CreateTableExpression
 
-public object Migration0001 : Migration {
+object Migration0001 : Migration {
     override val dependsOn: List<Migration> = listOf()
     override val actions: List<MigrationAction> = listOf(
         ReversibleSql(
             expression = CreateSchemaExpression(
                 name = "company",
+                ifNotExists = false,
                 isLeafNode = false,
                 extraProperties = mapOf()
             )
