@@ -73,6 +73,9 @@ public abstract class SqlSchemaFormatter(
 
     protected open fun visitCreateSchema(expr: CreateSchemaExpression): CreateSchemaExpression {
         writeKeyword("create schema ")
+        if(expr.ifNotExists) {
+            writeKeyword("if not exists ")
+        }
         write(expr.name.quoted)
         return expr
     }
@@ -85,7 +88,7 @@ public abstract class SqlSchemaFormatter(
     protected open fun visitCreateTable(expr: CreateTableExpression): CreateTableExpression {
         writeKeyword("create table ")
         if(expr.ifNotExists) {
-            writeKeyword("if not exists")
+            writeKeyword("if not exists ")
         }
         visitTableReference(expr.name)
 

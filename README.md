@@ -3,9 +3,6 @@ Ktorm migration support
 
 ## Status
 
-Currently broken
-
-
 Mostly complete, but needs api stabilization, testing and documentation.
 
 ## Usage
@@ -55,7 +52,7 @@ This will populate the folder with your migrations.
 ### Run Migrations
 
 ```kotlin
-LatestMigration.migrate(myDatabase)
+myDatabase.migrate(LatestMigration)
 ```
 
 ## Known issues

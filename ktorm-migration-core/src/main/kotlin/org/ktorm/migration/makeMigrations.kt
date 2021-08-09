@@ -17,7 +17,6 @@ public fun initializeMigrations(
 }
 
 private val Migration.number: Int get() = (this::class.simpleName ?: "").substringAfter("Migration").takeWhile { it.isDigit() }.toIntOrNull() ?: 0
-internal val Migration.packageName: String get() = (this::class.qualifiedName!!.substringBeforeLast('.'))
 
 public fun makeMigrations(
     folder: File,
@@ -28,7 +27,7 @@ public fun makeMigrations(
 ): Boolean {
     folder.mkdirs()
     val building = BuildingTables()
-    latestMigration?.migrateTables(building)
+    latestMigration?.let { building.apply(it) }
 
     val updates = building._tables.values.upgradeTo(tables.toList())
     if(updates.isEmpty()) {
@@ -39,13 +38,16 @@ public fun makeMigrations(
     updates.generateMigrationSource(
         name = migrationName,
         packageName = packageName,
-        dependsOn = listOf(latestMigration::class.simpleName!!),
+        dependsOn = listOfNotNull(latestMigration),
         out = out
     )
     folder.resolve("$migrationName.kt").writeText(out.toString())
     folder.resolve("LatestMigration.kt").writeText("""
         package $packageName
-        public val LatestMigration: Migration? = $migrationName
+        
+        import org.ktorm.migration.Migration
+        
+        public val LatestMigration: Migration = $migrationName
     """.trimIndent())
 
     return true

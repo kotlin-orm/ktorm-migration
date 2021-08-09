@@ -36,6 +36,7 @@ public operator fun ReversibleMigrationExpression.unaryMinus(): ReversedMigratio
 
 public data class CreateSchemaExpression(
     val name: String,
+    val ifNotExists: Boolean = false,
     override val isLeafNode: Boolean = false,
     override val extraProperties: Map<String, Any> = emptyMap()
 ) : SqlExpression(), ReversibleMigrationExpression {

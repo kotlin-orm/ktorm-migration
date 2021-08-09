@@ -183,7 +183,7 @@ open class SchemaTest {
         val recreated = tables._tables[Employees.asReferenceExpression()]!!
         val updates = recreated.upgradeTo(Employees)
         val out = StringBuilder()
-        updates.generateMigrationSource("TestMigration", number = 1, dependsOn = listOf("PreviousMigration"), out = out)
+        updates.generateMigrationSource("TestMigration", packageName = "org.ktorm.test", dependsOn = listOf(), out = out)
         println(out)
     }
 
@@ -191,18 +191,18 @@ open class SchemaTest {
     fun fullMigration(){
         val updates = listOf<MigrateTableMixin>().upgradeTo(listOf(Departments, Employees, Customers))
         val out = StringBuilder()
-        updates.generateMigrationSource("TestMigration", number = 1, dependsOn = listOf("PreviousMigration"), out = out)
+        updates.generateMigrationSource("TestMigration", packageName = "org.ktorm.test", dependsOn = listOf(), out = out)
         println(out)
 
         val migration = object: Migration {
-            override val number: Int
-                get() = 1
             override val actions: List<MigrationAction>
                 get() = updates.map { MigrationAction.ReversibleSql(it) }
             override val dependsOn: List<Migration>
                 get() = listOf()
+            override val qualifiedName: String
+                get() = "org.ktorm.test.GeneratedMigration"
         }
-        migration.migrate(database)
+        database.migrate(migration)
         database.insert(Departments) {
             set(it.id, 0)
             set(it.name, "Test Department")
@@ -214,7 +214,7 @@ open class SchemaTest {
             set(it.name, "Bob Boberson")
             set(it.departmentId, 0)
         }
-        migration.undo(database)
+        database.rollback(migration, migration)
     }
 
     @Test

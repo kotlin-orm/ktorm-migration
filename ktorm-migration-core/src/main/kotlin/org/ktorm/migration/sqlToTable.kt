@@ -14,24 +14,9 @@ public class BuildingTables {
     public fun apply(migration: Migration) {
         if (!_appliedMigrations.add(migration)) return
         for (dep in migration.dependsOn) {
-            process(dep)
+            apply(dep)
         }
-        migration.actions.forEach { it.migrateTables(tables) }
-        val processed = HashSet<Migration>()
-        fun process(migration: Migration) {
-        }
-        process(this)
-    }
-    public fun Migration.undoTables(tables: BuildingTables) {
-        val processed = HashSet<Migration>()
-        fun process(migration: Migration) {
-            if (!processed.add(migration)) return
-            for (dep in migration.dependsOn) {
-                process(dep)
-            }
-            migration.actions.asReversed().forEach { it.undoTables(tables) }
-        }
-        process(this)
+        migration.actions.forEach { it.migrateTables(this) }
     }
 
     public fun apply(sql: SqlExpression) {
